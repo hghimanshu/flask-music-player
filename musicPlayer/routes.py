@@ -5,12 +5,10 @@ from werkzeug import secure_filename
 import flask
 import time
 from flask import Flask,render_template,flash,redirect,url_for,session,logging,request
-from flask_mail import Mail,Message
 from flask_mysqldb import MySQL
 from wtforms import Form,StringField,TextAreaField,PasswordField,validators
 from passlib.hash import sha256_crypt
 from functools import wraps
-from itsdangerous import URLSafeTimedSerializer,SignatureExpired
 import os
 from bs4 import BeautifulSoup
 import requests
@@ -54,35 +52,35 @@ def register():
 #login
 @app.route('/login',methods=['GET','POST'])
 def login():
-	if request.method=='POST':
-		username=request.form['username']
+    if request.method=='POST':
+        username=request.form['username']
 
-		password_candidate=request.form['password']
+        password_candidate=request.form['password']
 
-		cur=mySql.connection.cursor()
+        cur=mySql.connection.cursor()
 
-		result=cur.execute("SELECT * FROM users WHERE username= %s",[username])
+        result=cur.execute("SELECT * FROM users WHERE username= %s",[username])
 
-		if result>0:
-			data=cur.fetchone()
-			incripted_password=data['password']
+        if result>0:
+            data=cur.fetchone()
+            incripted_password=data['password']
 
-			if sha256_crypt.verify(password_candidate,incripted_password):
-				session['logged_in']=True
-				session['username']=username
-				session['id']=data['id']
+            if sha256_crypt.verify(password_candidate,incripted_password):
+                session['logged_in']=True
+                session['username']=username
+                session['id']=data['id']
 
-				flash('login successful','success')
-				return redirect(url_for('dashboard'))
-			else:
-				error='wrong password'
+                flash('login successful','success')
+                return redirect(url_for('dashboard'))
+            else:
+                error='wrong password'
 
-		else:
-			error='Username not found'
+        else:
+            error='Username not found'
         cur.close()
         return render_template('login.html',error=error)
 
-	return render_template('login.html')
+    return render_template('login.html')
 
 #to prevent using of app without login
 def isUserLoggedIn(f):
