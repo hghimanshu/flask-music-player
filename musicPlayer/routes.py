@@ -7,46 +7,31 @@ import time
 from flask import Flask,render_template,flash,redirect,url_for,session,logging,request
 from flask_mysqldb import MySQL
 from wtforms import Form,StringField,TextAreaField,PasswordField,validators
-from passlib.hash import sha256_crypt
 from functools import wraps
 import os
 from bs4 import BeautifulSoup
 import requests
+from musicPlayer.db.connect import connection
 
-mySql = MySQL(app)
-
-class RegisterForm(Form):
-	name=StringField('Name',[validators.Length(min=1,max=50)])
-	username=StringField('Username',[validators.Length(min=4,max=25)])
-	email=StringField('Email',[validators.Length(min=6,max=50)])
-	password=PasswordField('Password',[validators.DataRequired(),validators.EqualTo('confirm',message='Password do not match')])
-	confirm=PasswordField('confirm Password')
-
+CUR, _ = connection()
 
 @app.route('/register',methods=['GET','POST'])
 def register():
-    form =RegisterForm(request.form)
-    if request.method=='POST' and form.validate():
-        name = form.name.data
-        email = form.email.data
-        username = form.username.data
-        password = sha256_crypt.encrypt(str(form.password.data))
-		
-        cur=mySql.connection.cursor()
-        result=cur.execute("SELECT * FROM users WHERE username= %s",[username])
-        result2=cur.execute("SELECT * FROM users WHERE email=%s",[email])
-		
-        if result>0:
-            error='User name already exists !!'
-            return render_template('register.html',form=form,error=error)
-        if result2>0:
-            error='Email already exists !!'
-            return render_template('register.html',form=form,error=error)
-        else:
-            flash('Success!! Your account has been created.','success')
-            return redirect(url_for('index'))
+	if flask.request.method == 'POST':
+		name = flask.request.form['name']
+		username = flask.request.form['username']
 
-    return render_template('register.html',form=form)
+		print(name, username)
+		result = CUR.execute("SELECT * FROM users WHERE username= %s",[username])
+		print(result)
+		if result>0:
+			error='User name already exists !!'
+			return render_template('register.html',error=error)
+		else:
+			flash('Success!! Your account has been created.','success')
+			return redirect(url_for('index'))
+
+	return render_template('register.html')
 
 
 #login
@@ -103,54 +88,35 @@ def logout():
 #search
 @app.route('/new',methods=['POST'])
 def new():
-	string=""
-	co=request.form['give']
-	song=co
-	song_name=co+'.mp3'
-	cur=mysql.connection.cursor()
-	result=cur.execute("SELECT * FROM songs_list WHERE song_name=%s",[song_name])
-	albu69=cur.fetchall()
-	if result>0:
-		return render_template('search.html',albu=albu69)
-	else:
-		try:
-			page = requests.get("https://www.youtube.com/results?search_query="+song)
-			soup = BeautifulSoup(page.text,'html.parser')
-			for div in soup.find_all('div', { "class" : "yt-lockup-video" }):
-				if div.get("data-context-item-id") != None:
-					video_id = div.get("data-context-item-id")
-					break
-			os.system('youtube-dl --extract-audio --audio-format mp3 -o "akhil.mp3" https://www.youtube.com/watch?v='+video_id)
-			os.system("mv *.mp3 ./static/music/")
-			os.rename("static/music/akhil.mp3","static/music/"+song_name)
-			string="/static/music/"+song_name
-			cur=mysql.connection.cursor()
-			cur.execute("INSERT INTO songs_list(path,album,song_name) VALUES (%s,%s,%s)",(string,"NA",song_name))
-			mysql.connection.commit()
-			result=cur.execute("SELECT * FROM songs_list WHERE song_name=%s",[song_name])
-			albu99=cur.fetchall()
-			return render_template('search.html',albu=albu99)
-		except NameError:
-			flash('Song Not Found','success')
-			return render_template('dashboard.html')
+    co=request.form['give']
+    song=co
+    song_name=co+'.mp3'
+    cur=mysql.connection.cursor()
+    result=cur.execute("SELECT * FROM songs_list WHERE song_name=%s",[song_name])
+    albu69=cur.fetchall()
+    if result>0:
+        cur.close()
+        return render_template('search.html',albu=albu69)
+    else:
+        cur.close()
+        flash('Song Not Found','success')
+        return render_template('dashboard.html')
 
 
 @app.route('/dashboard')
 @isUserLoggedIn
 def dashboard():
-	cur=mysql.connection.cursor()
+    cur=mySql.connection.cursor()
+    result=cur.execute("SELECT * from songs WHERE user_id = %s",[session['id']])
+    songs=cur.fetchall()
 
-	result=cur.execute("SELECT * from songs WHERE user_id = %s",[session['id']])
+    if result>0:
+        return render_template('dashboard.html',songs=songs)
+    else:
+        msg="NO PLAYLIST FOUND "
 
-	songs=cur.fetchall()
-
-	if result>0:
-		return render_template('dashboard.html',songs=songs)
-	else:
-		msg="NO PLAYLIST FOUND "
-
-	return render_template('dashboard.html',msg=msg)
-	cur.close()
+    cur.close()
+    return render_template('dashboard.html',msg=msg)
 
 class make_playlist(Form):
 	title=StringField('Name',[validators.Length(min=1,max=25)])

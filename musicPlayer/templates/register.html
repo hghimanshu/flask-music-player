@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="jumbotran text-center">
+	<h1>REGISTER</h1>
+	{% from "includes/_formhelpers.html" import render_field %}
+</div>
+
+<div class="container">    
+    <div class="row">
+      <br/><br/>
+      <div class="col-sm-4">
+		<form action="http://localhost:8000/register" method = "POST" enctype = "multipart/form-data">
+			<input type="text" name="name" placeholder="your name", required><br/> <br/>
+			<input type="text" name="username" placeholder="username" required><br/> <br />
+			<button type="submit" class="btn btn-primary">Make my account!!</button>
+		</form>
+	</div>
+    </div>
+  </div><br>
+  
+{% endblock %}
