@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 import requests
 from musicPlayer.db.connect import connection
 
-CUR, _ = connection()
+# CUR, _ = connection()
 
 @app.route('/register',methods=['GET','POST'])
 def register():
