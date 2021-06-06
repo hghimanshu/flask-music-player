@@ -12,6 +12,9 @@ import os
 import requests
 import musicPlayer.db.connect 
 from musicPlayer.db.users import InsertUser, fetchUserDetails
+from musicPlayer.users.register import RegisterUser
+from musicPlayer.users.login import LoginUser
+from musicPlayer.songs.fetchSongs import fetchSongInfo
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -21,8 +24,6 @@ logging.basicConfig(
 
 @app.route('/register',methods=['GET','POST'])
 def register():
-    insertObj = InsertUser()
-    fetchObj = fetchUserDetails()
     if flask.request.method == 'POST':
         password = flask.request.form['password']
         username = flask.request.form['username']
@@ -30,58 +31,50 @@ def register():
         firstname = flask.request.form['firstname']
         lastname = flask.request.form['lastname']
 
+
         if password != password2:
             error = "Both passwords must match !!"
             logging.info(error)
             return render_template('register.html',error=error)
 
-        userAlreadyPresent = fetchObj.checkIfuserNameExists(username)
-        if userAlreadyPresent is None:
-            logging.info("Something went wrong!!")
-        elif userAlreadyPresent == {}:
-            logging.info("User doesnt exists with this username")
-            res = insertObj.insert_into_db(username=username, password=password,firstname=firstname,lastname=lastname)
+        registerObj = RegisterUser(username, password, firstname, lastname)
+        '''
+        Register the user
+        '''
+
+        registerObj.insertUser()
+        if registerObj.successRes:
             flash('Success!! Your account has been created.','success')
             return redirect(url_for('login'))
         else:
-            error = "Username already exists !!"
-            logging.info(error)
-            return render_template('register.html',error=error)
+            logging.info(registerObj.message)
+            return render_template('register.html',error=registerObj.message)
 
     return render_template('register.html')
 
 
 @app.route('/login',methods=['GET','POST'])
 def login():
-    fetchObj = fetchUserDetails()
     if request.method=='POST':
         username=request.form['username']
 
         password_candidate=request.form['password']
 
-        res = fetchObj.checkUserCredentials(username, password_candidate)
+        loginObj = LoginUser(username, password_candidate)
+        loginObj.checkCreds()
 
-        if res:
-            logging.log("Successfully logged in !!")
+        if loginObj.successResponse:
+            logging.info(loginObj.message)
             session['logged_in']=True
-            session['username']=username
-            session['id']=res['_id']
+            session['id']=str(username)
 
             flash('login successful','success')
             return redirect(url_for('dashboard'))
-        elif res is False:
-            error = "Username / Password didn't matched"
-        elif res == {}:
-            error = "Username / Password didn't matched"
-        else:
-            error = "Something went wrong !!"
-        
-        return render_template('login.html',error=error)
+        else:    
+            return render_template('login.html',error=loginObj.message)
 
     return render_template('login.html')
 
-'''
-#to prevent using of app without login
 def isUserLoggedIn(f):
     @wraps(f)
     def wrap(*args,**kwargs):
@@ -92,6 +85,24 @@ def isUserLoggedIn(f):
             return redirect(url_for('login'))
     return wrap
 
+
+@app.route('/dashboard')
+@isUserLoggedIn
+def dashboard():
+    fetchObj = fetchSongInfo(session['id'])
+    fetchObj.getUserSongs()
+
+    if fetchObj.successResponse:
+        return render_template('dashboard.html',songs=fetchObj.songs)
+
+    return render_template('dashboard.html',msg=fetchObj.message)
+
+class make_playlist(Form):
+    title=StringField('Name',[validators.Length(min=1,max=25)])
+
+
+#to prevent using of app without login
+'''
 #logout
 @app.route('/logout')
 def logout():
@@ -115,25 +126,6 @@ def new():
         cur.close()
         flash('Song Not Found','success')
         return render_template('dashboard.html')
-
-
-@app.route('/dashboard')
-@isUserLoggedIn
-def dashboard():
-    cur=mySql.connection.cursor()
-    result=cur.execute("SELECT * from songs WHERE user_id = %s",[session['id']])
-    songs=cur.fetchall()
-
-    if result>0:
-        return render_template('dashboard.html',songs=songs)
-    else:
-        msg="NO PLAYLIST FOUND "
-
-    cur.close()
-    return render_template('dashboard.html',msg=msg)
-
-class make_playlist(Form):
-    title=StringField('Name',[validators.Length(min=1,max=25)])
 
 
 
